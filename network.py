@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+slim = tf.contrib.slim
 
 DEFAULT_PADDING = 'SAME'
 
@@ -158,5 +159,39 @@ class Network(object):
                 dim = 1
                 for d in input_shape[1:].as_list():
                     dim *= d
-                feed_in = tf.reshape
+                feed_in = tf.reshape(input, [-1,dim])
+            else:
+                feed_in, dim  = (input, input_shape[-1].value)
+            weights = self.make_var('weights', shape=[dim, num_out])
+            biases = self.make_var('biases', [num_out])
+            op = tf.nn.relu_layer if relu else tf.nn.xw_plus_b
+            fc = op(feed_in,weights, biases, name=scope.name)
+            return fc
 
+    @layer
+    def softmax(self,input, name):
+        input_shape = map(lambda v: v.value, input.get_shape())
+        if len(input_shape) > 2:
+            if input_shape[1] == 1 and input_shape[2] == 1:
+                input = tf.squeeze(input, squeeze_dims=[1,2])
+            else:
+                raise ValueError('Rank 2 tensor input expected for softmax!')
+
+        return tf.nn.softmax(input, name)
+
+    @layer
+    def bathch_normalization(self, input, name, is_training, activation_fn=None, scale=True):
+        with tf.variable_scope(name) as scope:
+            output = slim.batch_norm(
+                input,
+                activation_fn=activation_fn,
+                is_training=is_training,
+                updates_collections=None,
+                scale=scale,
+                scope=scope)
+            return output
+
+    @layer
+    def dropout(self, input, keep_prob, name):
+        keep = 1 - self.use_dropout + (self.use_dropout * keep_prob)
+        return tf.nn.dropout(input, keep, name=name)
