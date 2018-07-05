@@ -10,6 +10,7 @@ INSTANCE_DIR = '../Instance_id'
 TRAIN_ID_LIST = '../data/train_id_demo.txt'
 # TRAIN_ID_LIST = ['./data/train_id.txt']
 DATA_LIST = '../data/'
+IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
 
 def dataload():
     print('This is the data load function of the network')
@@ -19,6 +20,10 @@ def dataload():
     print(value)
     example = tf.decode_raw(value)
     print(example)
+def random_mirroring(img, human, category, instance):
+    distort_left_right_random = tf.random_uniform([1], 0, 1.0, dtype=tf.float32)[0]
+
+
 
 def read_labeled_image_list(data_dir,human_dir, category_dir, instance_dir, data_id_list):
 
@@ -38,6 +43,33 @@ def read_labeled_image_list(data_dir,human_dir, category_dir, instance_dir, data
             instance_list.append(instance_dir + line)
 
     return image_list, human_list, category_list, instance_list
+
+def read_images_from_disk(input_queue, input_size, random_scale, random_mirror=False):
+    img_content = tf.read_file(input_queue[0])
+    human_content = tf.read_file(input_queue[1])
+    category_content = tf.read_file(input_queue[2])
+    instance_content = tf.read_file(input_queue[3])
+
+    img = tf.image.decode_jpeg(img_content,channels=3)
+    img_r, img_g, img_b = tf.split(value=img,num_or_size_splits=3,axis=2)
+    img = tf.cast(tf.concat([img_b,img_g, img_r],2), dtype=tf.float32)
+
+    img -= IMG_MEAN
+
+    human = tf.image.decode_png(human_content, channels=1)
+    category = tf.image.decode_png(category_content,channels=1)
+    instance = tf.image.decode_png(instance_content,channels=1)
+
+    if input_size is not None:
+        h, w = input_size
+
+        if random_mirror:
+            print('random_mirror')
+            # img, human, category, instance = image_mirroring(img, human, category, instance)
+        if random_scale:
+            print('random_scale')
+
+    return img, human, category, instance
 
 
 class DataReader(object):
@@ -64,6 +96,11 @@ class DataReader(object):
 
 
         print(' Init the data reader')
+
+    def dequeue(self, num_elements):
+        batch_list = [self.image,  self.human, self.category, self.instance]
+        image_batch, human_batch, category_batch, instacne_batch = tf.train.batch(batch_list, num_elements)
+        return image_batch, human_batch, category_batch, instacne_batch
 
 
 
